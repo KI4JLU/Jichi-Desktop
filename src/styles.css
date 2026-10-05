@@ -1461,3 +1461,34 @@ main.haupt {
 .einrichten-vorschau li.ueberschrieben span { color: var(--color-error); }
 .einrichten-fertig { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--color-success) 10%, transparent); font-size: 13px; }
 .einrichten-fertig svg { color: var(--color-success); flex: none; margin-top: 1px; }
+
+/* ---- Live-Gespräch (Realtime-Bridge) ---- */
+.live { display: flex; flex-direction: column; height: 100%; min-height: 0; font-size: 12.5px; }
+.live-kopf { padding: 12px 14px 8px; border-bottom: 1px solid var(--color-outline-variant); display: flex; flex-direction: column; gap: 8px; }
+.live-adresse { margin-bottom: 0; }
+.live-zeile { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.live-zeile input:not([type=checkbox]), .live-zeile select { flex: 1; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--color-outline-variant); border-radius: 6px; background: var(--color-surface-container-lowest); color: var(--color-on-surface); font-size: 12px; }
+.live-zeile input:focus, .live-zeile select:focus, .live-kontext textarea:focus { outline: 0; border-color: var(--color-primary); }
+.live-klein select { flex: 0 0 auto; }
+.live-hinweis { color: var(--color-on-surface-variant); font-size: 11.5px; }
+.live-fehler { margin: 0; }
+.live-modelle { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; }
+.live-modelle div { background: var(--color-surface-container); border-radius: 6px; padding: 5px 8px; color: var(--color-on-surface-variant); font-size: 11px; }
+.live-modelle b { display: block; color: var(--color-on-surface); font-weight: 600; font-size: 12px; word-break: break-word; }
+.schalter-zeile { display: flex; gap: 6px; align-items: center; color: var(--color-on-surface-variant); }
+.live-kontext summary { cursor: pointer; color: var(--color-on-surface-variant); }
+.live-kontext textarea { width: 100%; margin: 6px 0; padding: 8px 10px; border: 1px solid var(--color-outline-variant); border-radius: 6px; background: var(--color-surface-container-lowest); color: var(--color-on-surface); font: inherit; font-size: 12px; resize: vertical; }
+.live-verlauf { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.live-nachricht { line-height: 1.5; }
+.live-nachricht b { margin-right: 6px; color: var(--color-on-surface-variant); }
+.live-nachricht.du b { color: var(--color-primary); }
+.live-nachricht.ki b { color: var(--color-tertiary, var(--color-secondary)); }
+.live-nachricht.hinweis { color: var(--color-error); }
+.live-unsicher { color: var(--color-on-surface-variant); font-style: italic; }
+.live-sprache { font-size: 10px; text-transform: uppercase; border: 1px solid var(--color-outline-variant); border-radius: 4px; padding: 0 4px; margin-right: 6px; color: var(--color-on-surface-variant); }
+.live-memo { text-align: center; color: var(--color-on-surface-variant); font-size: 11px; }
+.live-fuss { padding: 10px 14px 12px; border-top: 1px solid var(--color-outline-variant); display: flex; flex-direction: column; gap: 8px; }
+.live-status { color: var(--color-on-surface-variant); }
+.live-status.du-sprichst, .live-status.spricht { color: var(--color-primary); font-weight: 600; }
+.live-eingabe { flex: 1; }
+.live-zeiten { text-align: right; }

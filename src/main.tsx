@@ -14,14 +14,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
+  AudioLines,
   BookOpen,
+  FolderOpen,
   FolderTree,
   GitCompare,
   Globe,
+  Moon,
   PanelRight,
   SquareTerminal,
-  FolderOpen,
-  Moon,
   Sun,
 } from "lucide-react";
 import {
@@ -88,6 +89,7 @@ function App() {
       if (mod && e.shiftKey && k === "d") { e.preventDefault(); panel.aenderungen(); }
       if (mod && e.shiftKey && k === "b") { e.preventDefault(); panel.browser(); }
       if (mod && e.shiftKey && k === "h") { e.preventDefault(); panel.doku(); }
+      if (mod && e.shiftKey && k === "l") { e.preventDefault(); panel.live(); }
       if (e.ctrlKey && (e.key === "`" || e.code === "Backquote")) { e.preventDefault(); panel.terminal(); }
       if (mod && e.key === "\\") { e.preventDefault(); panel.closeActive(); }
       if (e.key === "Escape") setEinstellungen(false);
@@ -152,6 +154,7 @@ function App() {
               <button className="knopf-klein knopf-symbol" onClick={() => panel.terminal()} aria-label="Terminal" title={`Terminal (${t("Strg")}+\`)`}><SquareTerminal size={14} /></button>
               <button className="knopf-klein knopf-symbol" onClick={() => panel.browser()} aria-label="Browser" title={`Browser (${kurzTaste("⇧B")})`}><Globe size={14} /></button>
               <button className="knopf-klein knopf-symbol" onClick={() => panel.doku()} aria-label={t("jichi-Dokumentation")} title={`${t("jichi-Dokumentation")} (${kurzTaste("⇧H")})`}><BookOpen size={14} /></button>
+              <button className="knopf-klein knopf-symbol" onClick={() => panel.live()} aria-label={t("Live-Gespräch")} title={`${t("Live-Gespräch")} (${kurzTaste("⇧L")})`}><AudioLines size={14} /></button>
               <button className={`knopf-klein knopf-symbol${p.open ? " an" : ""}`} onClick={() => panel.toggle()} aria-label={t("Seitenleiste ein/aus")} aria-pressed={p.open} title={t("Seitenleiste")}><PanelRight size={14} /></button>
             </div>
             <button

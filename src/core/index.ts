@@ -22,6 +22,7 @@ export { initErgebnis, initPacks, type InitDatei, type InitErgebnis, type InitPa
 export { dokuKarte, dokuTitel, dokuVerweis, type DokuAbschnitt, type DokuSeite, type DokuStatus, type DokuTreffer } from "./doku.ts";
 export { locale, onSprache, setSprache, sprache, SPRACHEN, systemSprache, t, type Sprache } from "./i18n.ts";
 export { DEFAULT_SPEECH, DEFAULT_TRANSCRIBE, speechModel, sprechbar } from "./speech.ts";
+export { bridgeWebSocket, live, type LiveInfo, type LiveNachricht, type LiveSnapshot, type LiveStatus, type LiveSzenario, type LiveVerbindung } from "./realtime.ts";
 export { JsonRpcPeer, RpcCode, RpcError } from "./jsonrpc.ts";
 export {
   clearStored,

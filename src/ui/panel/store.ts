@@ -8,7 +8,7 @@
  * Anwendung neu startet, findet seine Fenster wieder.
  */
 
-export type PanelKind = "dateien" | "datei" | "aenderungen" | "terminal" | "browser" | "artefakt" | "doku";
+export type PanelKind = "dateien" | "datei" | "aenderungen" | "terminal" | "browser" | "artefakt" | "doku" | "live";
 
 export interface ArtefaktInhalt {
   title: string;
@@ -25,6 +25,8 @@ export type PanelTab =
   | { id: string; kind: "browser"; url: string }
   /** jichis Dokumentation; `seite` relativ zu docs/, leer = Übersicht. */
   | { id: string; kind: "doku"; seite?: string; anker?: string }
+  /** Live-Gespräch über eine Realtime-Bridge (Sprache rein, Sprache raus). */
+  | { id: string; kind: "live" }
   | ({ id: string; kind: "artefakt" } & ArtefaktInhalt);
 
 export interface PanelState {
@@ -49,7 +51,7 @@ function load(): PanelState {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? "null") as Partial<PanelState> | null;
     if (!raw || !Array.isArray(raw.tabs)) return leer;
     // Artefakte und Terminals des Agenten leben nur in der Sitzung.
-    const tabs = raw.tabs.filter((t) => t && ["dateien", "datei", "aenderungen", "terminal", "browser", "doku"].includes(t.kind))
+    const tabs = raw.tabs.filter((t) => t && ["dateien", "datei", "aenderungen", "terminal", "browser", "doku", "live"].includes(t.kind))
       .map((t) => (t.kind === "terminal" ? { id: t.id, kind: "terminal" as const } : t));
     const active = tabs.some((t) => t.id === raw.active) ? raw.active ?? null : tabs[0]?.id ?? null;
     return {
@@ -119,6 +121,10 @@ export const panel = {
       () => ({ id: neueId(), kind: "doku", seite }),
       (t) => (t.kind === "doku" && seite !== undefined ? { ...t, seite, anker: undefined } : t),
     );
+  },
+  /** Live-Gespräch: mit der Realtime-Bridge sprechen. */
+  live(): void {
+    zeige((t) => t.kind === "live", () => ({ id: neueId(), kind: "live" }));
   },
   aenderungen(): void {
     zeige((t) => t.kind === "aenderungen", () => ({ id: neueId(), kind: "aenderungen" }));

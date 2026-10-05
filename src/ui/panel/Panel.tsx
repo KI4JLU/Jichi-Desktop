@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { BookOpen, FileCode2, FolderTree, GitCompare, Globe, Maximize2, Minimize2, Plus, Sparkles, SquareTerminal, X } from "lucide-react";
+import { AudioLines, BookOpen, FileCode2, FolderTree, GitCompare, Globe, Maximize2, Minimize2, Plus, Sparkles, SquareTerminal, X } from "lucide-react";
 
 import { t, type Snapshot } from "../../core/index.ts";
 import { useSprache } from "../util.ts";
@@ -18,6 +18,7 @@ import { TerminalFenster } from "./Terminal.tsx";
 import { BrowserFenster } from "./Browser.tsx";
 import { ArtefaktFenster } from "./Artefakt.tsx";
 import { DokuFenster } from "./Doku.tsx";
+import { LiveFenster } from "./Live.tsx";
 
 export const usePanel = () => useSyncExternalStore(panel.subscribe, panel.getSnapshot);
 
@@ -37,6 +38,8 @@ function titel(tab: PanelTab): { icon: ReactNode; text: string } {
       return { icon: <Sparkles size={13} />, text: tab.title };
     case "doku":
       return { icon: <BookOpen size={13} />, text: t("jichi-Doku") };
+    case "live":
+      return { icon: <AudioLines size={13} />, text: t("Live-Gespräch") };
   }
 }
 
@@ -79,6 +82,7 @@ function NeuMenue() {
           {punkt(<SquareTerminal size={15} />, t("Terminal"), `${t("Strg")}+\``, () => panel.terminal(undefined, true))}
           {punkt(<Globe size={15} />, t("Browser"), `${kurz}⇧B`, () => panel.browser())}
           {punkt(<BookOpen size={15} />, t("jichi-Dokumentation"), `${kurz}⇧H`, () => panel.doku())}
+          {punkt(<AudioLines size={15} />, t("Live-Gespräch"), `${kurz}⇧L`, () => panel.live())}
         </div>
       )}
     </div>
@@ -152,6 +156,7 @@ export function Panel({ snap }: { snap: Snapshot }) {
               {tab.kind === "browser" && <BrowserFenster tab={tab} sichtbar={sichtbar && !p.overlay && !zieht} />}
               {tab.kind === "artefakt" && <ArtefaktFenster tab={tab} />}
               {tab.kind === "doku" && <DokuFenster tab={tab} snap={snap} />}
+              {tab.kind === "live" && <LiveFenster />}
             </div>
           );
         })}
