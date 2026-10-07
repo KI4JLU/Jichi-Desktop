@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>jichi Desktop nimmt nur auf, während du diktierst. Die Aufnahme geht an das Gateway des HRZ und wird dort in Text umgewandelt.</string>
+	<string>jichi Desktop nimmt nur auf, während du diktierst oder im Live-Gespräch sprichst. Die Aufnahme geht an das Gateway des HRZ beziehungsweise an die eingetragene Realtime-Bridge und wird dort in Text umgewandelt.</string>
 </dict>
 </plist>
