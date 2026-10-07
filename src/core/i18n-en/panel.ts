@@ -178,4 +178,13 @@ export const PANEL: Record<string, string> = {
   "Läuft die Bridge, ist der Tunnel offen?": "Is the bridge running and the tunnel open?",
   "Mikrofon nicht verfügbar:": "Microphone not available:",
   "Fehler": "Error",
+  "speichere …": "saving …",
+  "Lehrenden-Modus aktiv": "Teacher mode active",
+  "Passwort falsch": "Wrong password",
+  "Lehrenden-Modus ist nicht eingerichtet": "Teacher mode is not set up",
+  "Für alle gespeichert — gilt ab dem nächsten Gespräch": "Saved for everyone — applies from the next conversation",
+  "Für alle speichern": "Save for everyone",
+  "eingebautes Szenario: nur „Kontext übernehmen“ möglich": "built-in scenario: only “Apply context” possible",
+  "Passwort für Lehrende": "Teacher password",
+  "Für Lehrende entsperren": "Unlock for teachers",
 };

@@ -37,6 +37,8 @@ export function LiveFenster() {
   const [url, setUrl] = useState(s.url || "http://127.0.0.1:8001");
   const [text, setText] = useState("");
   const [kontext, setKontext] = useState("");
+  const [passwort, setPasswort] = useState("");
+  const voll = s.lehrende.aktiv && s.lehrende.szenario?.id === s.szenario ? s.lehrende.szenario : null;
   const verlauf = useRef<HTMLDivElement>(null);
 
   const szenario = s.szenarien.find((x) => x.id === s.szenario);
@@ -48,8 +50,9 @@ export function LiveFenster() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setKontext(szenario?.hidden ? "" : (s.kontext ?? szenario?.prompt ?? ""));
-  }, [s.szenario, s.kontext, szenario?.prompt, szenario?.hidden]);
+    if (voll) setKontext(voll.prompt);
+    else setKontext(szenario?.hidden ? "" : (s.kontext ?? szenario?.prompt ?? ""));
+  }, [s.szenario, s.kontext, szenario?.prompt, szenario?.hidden, voll?.prompt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     verlauf.current?.scrollTo({ top: verlauf.current.scrollHeight });
@@ -119,8 +122,16 @@ export function LiveFenster() {
             </div>
             <details className="live-kontext">
               <summary>{t("Kontext / Rolle")}</summary>
-              {szenario?.hidden ? (
+              {szenario?.hidden && !voll ? (
                 <div className="live-hinweis">{t("Der Kontext dieses Szenarios ist verborgen (z. B. ein Fallprofil für Studierende).")}</div>
+              ) : voll ? (
+                <>
+                  <textarea rows={10} value={kontext} onChange={(e) => setKontext(e.target.value)} />
+                  <div className="live-zeile">
+                    {voll.editable && <button className="knopf-klein" onClick={() => live.szenarioSpeichern(kontext)}>{t("Für alle speichern")}</button>}
+                    <span className="live-hinweis">{voll.editable ? voll.source : t("eingebautes Szenario: nur „Kontext übernehmen“ möglich")}</span>
+                  </div>
+                </>
               ) : (
                 <>
                   <textarea rows={6} value={kontext} onChange={(e) => setKontext(e.target.value)} />
@@ -131,6 +142,15 @@ export function LiveFenster() {
                   </div>
                 </>
               )}
+              {s.lehrende.verfuegbar && !s.lehrende.aktiv && (
+                <div className="live-zeile">
+                  <input type="password" value={passwort} placeholder={t("Passwort für Lehrende")}
+                    onChange={(e) => setPasswort(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { live.lehrendeAnmelden(passwort); setPasswort(""); } }} />
+                  <button className="knopf-klein" onClick={() => { live.lehrendeAnmelden(passwort); setPasswort(""); }}>{t("Für Lehrende entsperren")}</button>
+                </div>
+              )}
+              {s.lehrende.meldung && <div className="live-hinweis">{s.lehrende.meldung}</div>}
             </details>
           </>
         )}

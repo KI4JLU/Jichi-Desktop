@@ -63,6 +63,16 @@ export interface LiveSnapshot {
   nachrichten: LiveNachricht[];
   wiederhergestellt: number;
   zeiten: { stt?: number; ersterTon?: number; gesamt?: number };
+  /** Lehrenden-Modus: verborgene Szenarien sehen und für alle speichern. */
+  lehrende: { verfuegbar: boolean; aktiv: boolean; meldung: string | null; szenario: LiveSzenarioVoll | null };
+}
+
+/** Ein Szenario mit vollem Text (nur nach Anmeldung als Lehrende/r). */
+export interface LiveSzenarioVoll extends LiveSzenario {
+  prompt: string;
+  voice_style: string;
+  editable: boolean;
+  source: string;
 }
 
 interface Gespeichert {
@@ -148,6 +158,7 @@ class LiveClient {
       nachrichten: [],
       wiederhergestellt: 0,
       zeiten: {},
+      lehrende: { verfuegbar: false, aktiv: false, meldung: null, szenario: null },
     };
   }
 
@@ -262,7 +273,25 @@ class LiveClient {
 
   // ---- Einstellungen ----------------------------------------------------
 
+  // ---- Lehrende ---------------------------------------------------------
+
+  lehrendeAnmelden(passwort: string): void {
+    this.senden({ type: "bridge.teacher.login", password: passwort });
+  }
+
+  /** Den (auch verborgenen) Text eines Szenarios für alle speichern. */
+  szenarioSpeichern(prompt: string): void {
+    const sz = this.snap.lehrende.szenario;
+    if (!sz || !this.snap.lehrende.aktiv) return;
+    this.senden({ type: "bridge.scenario.save", scenario: { ...sz, prompt } });
+    this.setze({ lehrende: { ...this.snap.lehrende, meldung: t("speichere …") } });
+  }
+
   szenarioWaehlen(id: string): void {
+    if (this.snap.lehrende.aktiv) {
+      this.setze({ lehrende: { ...this.snap.lehrende, szenario: null } });
+      this.senden({ type: "bridge.scenario.get", id });
+    }
     this.g.szenario = id;
     schreiben(this.g);
     const sz = this.snap.szenarien.find((x) => x.id === id);
@@ -423,12 +452,27 @@ class LiveClient {
 
   private ereignis(ev: Record<string, any>): void {
     switch (ev.type) {
+      case "bridge.teacher": {
+        const aktiv = !!ev.ok;
+        this.setze({ lehrende: { ...this.snap.lehrende, aktiv,
+          meldung: aktiv ? t("Lehrenden-Modus aktiv") : ev.enabled ? t("Passwort falsch") : t("Lehrenden-Modus ist nicht eingerichtet") } });
+        if (aktiv) this.senden({ type: "bridge.scenario.get", id: this.snap.szenario });
+        break;
+      }
+      case "bridge.scenario":
+      case "bridge.scenario.saved":
+        if (ev.scenario?.id === this.snap.szenario) {
+          this.setze({ lehrende: { ...this.snap.lehrende, szenario: ev.scenario as LiveSzenarioVoll,
+            meldung: ev.type === "bridge.scenario.saved" ? t("Für alle gespeichert — gilt ab dem nächsten Gespräch") : this.snap.lehrende.meldung } });
+        }
+        break;
       case "session.created":
       case "session.updated": {
         const b = ev.session?.bridge;
         if (!b) break;
         const szenarien: LiveSzenario[] = b.scenarios ?? this.snap.szenarien;
         const kurz = (m: string | undefined) => (m ?? "–").split("/").pop() ?? "–";
+        this.setze({ lehrende: { ...this.snap.lehrende, verfuegbar: !!b.teacher_mode } });
         this.setze({
           info: {
             version: b.version,
