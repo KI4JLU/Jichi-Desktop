@@ -128,6 +128,7 @@ class LiveClient {
   private g = lesen();
   private ws: WebSocket | null = null;
   private ctx: AudioContext | null = null;
+  private tonPruefung: ReturnType<typeof setTimeout> | null = null;
   private mic: MediaStream | null = null;
   private worklet: AudioWorkletNode | null = null;
   private playHead = 0;
@@ -332,6 +333,28 @@ class LiveClient {
     return this.ctx;
   }
 
+  /**
+   * Ton freigeben — aus jedem Klick und jeder Taste in der Live-Ansicht.
+   * WebKit (das Fenster dieser Anwendung unter macOS und Linux) lässt ein
+   * AudioContext nur laufen, wenn es in einer Benutzeraktion entsteht oder
+   * fortgesetzt wird. Entsteht es erst, wenn die Antwort ankommt, bleibt es
+   * stumm „suspended“ — im Chromium der Prüfungen fiel das nicht auf.
+   * Dazu der übliche Safari-Griff: ein Sample Stille, im Klick abgespielt.
+   */
+  tonFreigeben(): void {
+    const ctx = this.audio();
+    if (ctx.state !== "running") void ctx.resume();
+    try {
+      const q = ctx.createBufferSource();
+      q.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      q.connect(ctx.destination);
+      q.start(0);
+    } catch {
+      /* ohne Ton geht der Rest trotzdem */
+    }
+    if (this.snap.fehler === t("Ton ist blockiert — einmal in die Live-Ansicht klicken.")) this.setze({ fehler: null });
+  }
+
   async mikrofonAn(): Promise<void> {
     if (this.snap.verbindung !== "verbunden") return;
     const ctx = this.audio();
@@ -366,6 +389,15 @@ class LiveClient {
 
   private abspielen(b64: string): void {
     const ctx = this.audio();
+    // Kam die Antwort, bevor jemand geklickt hat, bleibt der Ton gesperrt:
+    // dann sagen, statt still zu bleiben. Kurz warten — gleich nach dem
+    // Anlegen ist auch ein erlaubtes AudioContext noch einen Moment „suspended“.
+    if (ctx.state === "suspended" && !this.tonPruefung) {
+      this.tonPruefung = setTimeout(() => {
+        this.tonPruefung = null;
+        if (this.ctx?.state === "suspended") this.setze({ fehler: t("Ton ist blockiert — einmal in die Live-Ansicht klicken.") });
+      }, 300);
+    }
     const bin = atob(b64);
     const n = bin.length >> 1;
     const f32 = new Float32Array(n);

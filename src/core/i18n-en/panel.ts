@@ -187,4 +187,5 @@ export const PANEL: Record<string, string> = {
   "eingebautes Szenario: nur „Kontext übernehmen“ möglich": "built-in scenario: only “Apply context” possible",
   "Passwort für Lehrende": "Teacher password",
   "Für Lehrende entsperren": "Unlock for teachers",
+  "Ton ist blockiert — einmal in die Live-Ansicht klicken.": "Sound is blocked — click once in the live view.",
 };

@@ -64,7 +64,8 @@ export function LiveFenster() {
   }
 
   return (
-    <div className="live">
+    // Jeder Klick, jede Taste hier gibt den Ton frei (WebKit, siehe tonFreigeben).
+    <div className="live" onPointerDownCapture={() => live.tonFreigeben()} onKeyDownCapture={() => live.tonFreigeben()}>
       <div className="live-kopf">
         <label className="feld live-adresse">
           <span>{t("Realtime-Bridge")}</span>
