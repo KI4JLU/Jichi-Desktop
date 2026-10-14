@@ -18,6 +18,28 @@ import { oeffneSocket, type Socket } from "./socket.ts";
  *  Bridge-Schlüssel liest. Hier steht nur der Name. */
 const SCHLUESSEL_KONTO = "BRIDGE_API_KEY";
 
+/**
+ * Wie laut etwas sein muss, um als Sprache zu gelten (0..1, wie bei OpenAI).
+ *
+ * Die Bridge rechnet daraus `200 + Schwelle * 800` auf der int16-Skala und
+ * erklaert schon **60 ms** darueber zu Sprache — und bricht damit sofort eine
+ * laufende Antwort ab. Bei 0,5 reicht dafuer ein Rascheln, ein Atemzug oder
+ * der eigene Lautsprecher, den das Mikrofon mithoert. Hoeher heisst: man wird
+ * nicht mehr von jedem Geraeusch unterbrochen, muss aber normal laut sprechen.
+ */
+const SCHWELLE = 0.72;
+
+/**
+ * So lange Stille, bis der Satz als beendet gilt.
+ *
+ * 550 ms sind kuerzer als eine gewoehnliche Denkpause im Deutschen. Die Folge
+ * war nicht nur ein zu frueher Antwortbeginn, sondern ein **halber Satz** fuer
+ * die Erkennung — und aus einem Bruchstueck raet Whisper die Sprache falsch.
+ * Kostet rund eine Viertelsekunde, verhindert aber das Abschneiden.
+ */
+const STILLE_MS = 800;
+
+
 const RATE = 24000;
 const KEY = "jichi-desktop.live";
 
@@ -159,7 +181,11 @@ class LiveClient {
       szenarien: [],
       szenario: this.g.szenario ?? "assistent",
       kontext: null,
-      spracheFest: this.g.spracheFest ?? false,
+      // Vorgabe: festgelegt statt geraten. Die automatische Erkennung
+      // verfehlt kurze deutsche Saetze regelmaessig, und fuer Sprachen ohne
+      // Stimme antwortet die Bridge ohnehin in DEFAULT_LANGUAGE. Wer es
+      // einmal abgeschaltet hat, behaelt seine Wahl.
+      spracheFest: this.g.spracheFest ?? true,
       sprache: this.g.sprache ?? "de",
       nachrichten: [],
       wiederhergestellt: 0,
@@ -275,7 +301,13 @@ class LiveClient {
             format: fmt,
             transcription: { model: "whisper-1", language: this.snap.spracheFest ? this.snap.sprache : null },
             turn_detection: this.snap.mikrofon
-              ? { type: "server_vad", threshold: 0.5, silence_duration_ms: 550, prefix_padding_ms: 300, create_response: true }
+              ? {
+                  type: "server_vad",
+                  threshold: SCHWELLE,
+                  silence_duration_ms: STILLE_MS,
+                  prefix_padding_ms: 300,
+                  create_response: true,
+                }
               : null,
           },
           output: { format: fmt },
