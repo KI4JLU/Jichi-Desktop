@@ -176,6 +176,8 @@ export const PANEL: Record<string, string> = {
   "Bitte die Adresse der Bridge eintragen.": "Please enter the bridge address.",
   "Keine Verbindung zu": "No connection to",
   "Läuft die Bridge, ist der Tunnel offen?": "Is the bridge running and the tunnel open?",
+  "Die Bridge hat den Schlüssel abgelehnt. In den Einstellungen hinterlegen.":
+    "The bridge rejected the key. Store it in the settings.",
   "Mikrofon nicht verfügbar:": "Microphone not available:",
   "Fehler": "Error",
   "speichere …": "saving …",

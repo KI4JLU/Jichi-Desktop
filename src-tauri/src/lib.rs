@@ -1065,6 +1065,139 @@ fn readiness_now(program: Option<String>) -> Readiness {
     }
 }
 
+
+// ── Live-Gespräch: WebSocket zur Voice-Bridge ────────────────────────────────
+//
+// Warum das hier liegt und nicht im Fenster: die Bridge verlangt auf ihrem
+// Netzport `Authorization: Bearer <BRIDGE_API_KEY>`, und ein WebSocket im
+// Browser kann **keine** Kopfzeilen setzen -- das sieht der Standard nicht vor.
+// Ein Verbindungsversuch aus dem Fenster endet darum immer mit 401.
+//
+// Der zweite Grund wiegt schwerer: so kommt der Schlüssel gar nicht erst ins
+// Fenster. Er wird hier aus der geschützten Ablage gelesen, in die Kopfzeile
+// gesetzt und nie an JavaScript gereicht. Was die Seite nie sieht, kann sie
+// auch nicht verlieren.
+
+use futures_util::{SinkExt, StreamExt};
+
+struct BridgeConn {
+    generation: u64,
+    out: tokio::sync::mpsc::UnboundedSender<String>,
+    task: tokio::task::AbortHandle,
+}
+
+#[derive(Default)]
+struct Bridge {
+    conn: Mutex<Option<BridgeConn>>,
+    next_gen: AtomicU64,
+}
+
+fn bridge_stop(live: &Bridge) {
+    if let Some(alt) = live.conn.lock().ok().and_then(|mut g| g.take()) {
+        alt.task.abort();
+    }
+}
+
+/// Öffnet die Verbindung. `secret` ist der Name des Eintrags in der Ablage,
+/// nicht der Schlüssel selbst -- der verlässt diese Seite nicht.
+#[tauri::command]
+async fn live_connect(
+    app: AppHandle,
+    state: State<'_, Bridge>,
+    url: String,
+    secret: Option<String>,
+) -> Result<u64, String> {
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+    bridge_stop(&state);
+    let generation = state.next_gen.fetch_add(1, Ordering::SeqCst) + 1;
+
+    let mut request = url
+        .as_str()
+        .into_client_request()
+        .map_err(|e| format!("{url} ist keine gültige Adresse: {e}"))?;
+
+    if let Some(konto) = secret.as_deref().filter(|k| !k.trim().is_empty()) {
+        let wert = secret_read(konto.trim())
+            .ok_or_else(|| format!("In der Ablage liegt nichts unter „{konto}“."))?;
+        let kopf = format!("Bearer {wert}")
+            .parse()
+            .map_err(|_| "Der Schlüssel enthält Zeichen, die in keine Kopfzeile passen.")?;
+        request.headers_mut().insert("Authorization", kopf);
+    }
+
+    let (socket, _) = tokio_tungstenite::connect_async(request)
+        .await
+        .map_err(|e| format!("Keine Verbindung zur Bridge: {e}"))?;
+    let (mut schreiber, mut leser) = socket.split();
+
+    let (out, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+
+    let task_app = app.clone();
+    let handle = tokio::spawn(async move {
+        use tokio_tungstenite::tungstenite::Message;
+        loop {
+            tokio::select! {
+                // Vom Fenster zur Bridge.
+                zu_senden = rx.recv() => match zu_senden {
+                    Some(text) => {
+                        if schreiber.send(Message::Text(text.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                    None => break,
+                },
+                // Von der Bridge zum Fenster.
+                empfangen = leser.next() => match empfangen {
+                    Some(Ok(Message::Text(text))) => {
+                        let _ = task_app.emit(
+                            "live-message",
+                            LineEvent { generation, line: text.to_string() },
+                        );
+                    }
+                    // Ping/Pong erledigt die Bibliothek; Binärdaten schickt die
+                    // Bridge nicht, Audio kommt als base64 im JSON.
+                    Some(Ok(_)) => {}
+                    Some(Err(e)) => {
+                        let _ = task_app.emit(
+                            "live-error",
+                            LineEvent { generation, line: e.to_string() },
+                        );
+                        break;
+                    }
+                    None => break,
+                },
+            }
+        }
+        let _ = task_app.emit("live-closed", generation);
+    });
+
+    *state.conn.lock().map_err(|_| "Zustand gesperrt")? = Some(BridgeConn {
+        generation,
+        out,
+        task: handle.abort_handle(),
+    });
+    Ok(generation)
+}
+
+#[tauri::command]
+fn live_send(state: State<Bridge>, generation: u64, line: String) -> Result<(), String> {
+    let guard = state.conn.lock().map_err(|_| "Zustand gesperrt")?;
+    let conn = guard.as_ref().ok_or("Die Verbindung steht nicht.")?;
+    // Nach einem Neustart darf eine alte Oberfläche nicht in die neue Sitzung schreiben.
+    if conn.generation != generation {
+        return Err("veraltete Verbindung".into());
+    }
+    conn.out
+        .send(line)
+        .map_err(|_| "Die Verbindung ist bereits geschlossen.".to_string())
+}
+
+#[tauri::command]
+fn live_close(state: State<Bridge>) {
+    bridge_stop(&state);
+}
+
 // ── Startvorschlag ───────────────────────────────────────────────────────────
 
 #[derive(Serialize, Clone)]
@@ -2348,6 +2481,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .manage(Acp::default())
+        .manage(Bridge::default())
         .manage(terminal::Terminals::default())
         .manage(pty::Ptys::default())
         .manage(artefakt::Artefakte::default())
@@ -2426,7 +2560,10 @@ pub fn run() {
             term_output,
             term_wait,
             term_kill,
-            term_release
+            term_release,
+                    live_connect,
+            live_send,
+            live_close
         ])
         // Ohne das überlebt der Agent das Fenster und bleibt als Waise im
         // Prozessbaum stehen — beim Entwickeln nach zehn Neustarts zehn Agenten.
@@ -2989,6 +3126,56 @@ mod tests {
         // Fehlt irgendetwas, muss der erste Start verlangt werden.
         let fehlt = r.agent.is_none() || !r.config.exists || r.config.models.is_empty() || !r.key_stored;
         assert_eq!(r.needs_setup, fehlt);
+    }
+
+    /// Der Weg, den das Live-Gespräch nimmt: Schlüssel aus der Ablage lesen,
+    /// als Kopfzeile setzen, Handschlag mit der Bridge.
+    ///
+    /// Das ist die Prüfung, die der Browser nicht bestehen *kann* — sein
+    /// WebSocket schickt keine Kopfzeilen und bekommt darum 401. Allein
+    /// starten, damit keine andere Prüfung die Ablage umlenkt:
+    ///
+    ///     cargo test tests::live_handschlag -- --ignored --exact --nocapture
+    #[tokio::test]
+    #[ignore = "braucht die echte Ablage, das VPN und eine laufende Bridge"]
+    async fn live_handschlag() {
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+        // Die echte Ablage, nicht das Testverzeichnis.
+        std::env::remove_var("JICHI_DESKTOP_DIR");
+
+        let schluessel = secret_read("BRIDGE_API_KEY")
+            .expect("BRIDGE_API_KEY liegt in der Ablage");
+        assert!(schluessel.len() >= 32, "Schlüssel wirkt zu kurz");
+
+        let url = "wss://sv90146.hrz.uni-giessen.de/v1/realtime";
+
+        // Erst der Gegenbeweis: ohne Kopfzeile muss es scheitern.
+        let ohne = tokio_tungstenite::connect_async(url.into_client_request().unwrap()).await;
+        assert!(ohne.is_err(), "ohne Schlüssel darf die Bridge nicht verbinden");
+        println!("ohne Kopfzeile: abgewiesen (erwartet)");
+
+        // Und nun der Weg der Anwendung.
+        let mut request = url.into_client_request().unwrap();
+        request
+            .headers_mut()
+            .insert("Authorization", format!("Bearer {schluessel}").parse().unwrap());
+        let (socket, antwort) = tokio_tungstenite::connect_async(request)
+            .await
+            .expect("mit Schlüssel verbindet die Bridge");
+        println!("mit Kopfzeile: {} ", antwort.status());
+
+        use futures_util::StreamExt;
+        let (_, mut leser) = socket.split();
+        // Die Bridge meldet sich von selbst mit session.created.
+        let erste = tokio::time::timeout(std::time::Duration::from_secs(15), leser.next())
+            .await
+            .expect("die Bridge meldet sich")
+            .expect("Nachricht")
+            .expect("gültige Nachricht");
+        let text = erste.into_text().expect("Text");
+        println!("erste Nachricht: {}", &text[..text.len().min(120)]);
+        assert!(text.contains("session"), "erwartet wurde session.created: {text}");
     }
 
     /// Der ganze Weg gegen den echten Agenten: finden, Schlüssel aus der Datei

@@ -12,6 +12,11 @@
  */
 
 import { t } from "./i18n.ts";
+import { oeffneSocket, type Socket } from "./socket.ts";
+
+/** Eintrag in der geschützten Ablage, aus dem die Rust-Seite den
+ *  Bridge-Schlüssel liest. Hier steht nur der Name. */
+const SCHLUESSEL_KONTO = "BRIDGE_API_KEY";
 
 const RATE = 24000;
 const KEY = "jichi-desktop.live";
@@ -126,7 +131,7 @@ const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
 class LiveClient {
   private g = lesen();
-  private ws: WebSocket | null = null;
+  private ws: Socket | null = null;
   private ctx: AudioContext | null = null;
   private tonPruefung: ReturnType<typeof setTimeout> | null = null;
   private mic: MediaStream | null = null;
@@ -194,9 +199,12 @@ class LiveClient {
     schreiben(this.g);
     this.setze({ url: this.g.url, verbindung: "verbinde", fehler: null, nachrichten: [], wiederhergestellt: 0 });
     await new Promise<void>((resolve) => {
-      let ws: WebSocket;
+      // Nicht der WebSocket des Browsers: der kann keine Kopfzeile mitschicken,
+      // und die Bridge verlangt im Netz "Authorization: Bearer". Siehe socket.ts.
+      // Übergeben wird nur der Name des Eintrags, nie der Schlüssel selbst.
+      let ws: Socket;
       try {
-        ws = new WebSocket(ziel);
+        ws = oeffneSocket(ziel, SCHLUESSEL_KONTO);
       } catch (e) {
         this.setze({ verbindung: "fehler", fehler: String(e) });
         resolve();
@@ -208,8 +216,13 @@ class LiveClient {
         this.setze({ verbindung: "verbunden" });
         resolve();
       };
-      ws.onerror = () => {
-        this.setze({ verbindung: "fehler", fehler: `${t("Keine Verbindung zu")} ${ziel}. ${t("Läuft die Bridge, ist der Tunnel offen?")}` });
+      ws.onerror = (grund) => {
+        // Der Grund aus Rust ist brauchbarer als eine allgemeine Vermutung:
+        // "401" heisst fehlender Schlüssel, nicht "Bridge läuft nicht".
+        const hinweis = /401|unauthorized/i.test(grund)
+          ? t("Die Bridge hat den Schlüssel abgelehnt. In den Einstellungen hinterlegen.")
+          : `${t("Keine Verbindung zu")} ${ziel}. ${t("Läuft die Bridge, ist der Tunnel offen?")}`;
+        this.setze({ verbindung: "fehler", fehler: hinweis });
         resolve();
       };
       ws.onclose = () => {
@@ -235,7 +248,7 @@ class LiveClient {
   }
 
   private senden(ev: object): void {
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(ev));
+    if (this.ws?.offen) this.ws.send(JSON.stringify(ev));
   }
 
   private gespraech(neu: boolean): string {
