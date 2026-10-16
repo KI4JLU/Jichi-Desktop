@@ -482,17 +482,33 @@ class LiveClient {
     if (this.ki) this.kiAbschliessen(true);
   }
 
-  /** KI-Text im Takt der Stimme aufdecken (Wörter, nie rückwärts). */
+  /**
+   * KI-Text im Takt der Stimme aufdecken — nie schneller als gesprochen wird.
+   *
+   * Aufgedeckt wird **anteilig**: so viel vom Text, wie vom vorliegenden Ton
+   * schon gespielt ist. Beides beschreibt denselben Inhalt, also stimmt das
+   * Verhältnis auch dann, wenn der Text der Stimme vorauseilt — und das tut er
+   * immer, weil das Modell schreibt, während die Sprachausgabe noch rechnet.
+   *
+   * Eine Rate in Zeichen je Sekunde zu schätzen wäre hier falsch: Ziffern sind
+   * der Extremfall. "1-2-3-4" sind sieben Zeichen und zweieinhalb Sekunden
+   * Sprache — jede feste Rate liegt um ein Vielfaches daneben.
+   */
   private takt = (): void => {
     const k = this.ki;
     if (k && k.start !== null && this.ctx) {
       const gespielt = Math.max(0, this.ctx.currentTime - k.start);
-      const rate = k.dauer ? k.text.length / k.dauer : 15;
-      let n = Math.min(k.text.length, Math.floor(gespielt * rate));
+      const vorhanden = Math.max(0.05, (k.dauer ?? this.playHead - k.start));
+      let n = Math.min(k.text.length, Math.floor(k.text.length * (gespielt / vorhanden)));
+
+      // Lieber an einer Wortgrenze schneiden — aber **rückwärts**. Vorwärts
+      // hiesse, dem Ton vorauszueilen, und wo gar kein Leerzeichen mehr folgt
+      // (eben "1-2-3-4"), erschiene schlagartig der ganze Rest.
       if (n < k.text.length) {
-        const sp = k.text.indexOf(" ", n);
-        n = sp < 0 ? k.text.length : sp;
+        const grenze = k.text.lastIndexOf(" ", n);
+        if (grenze > k.gezeigt) n = grenze;
       }
+
       if (n > k.gezeigt) {
         k.gezeigt = n;
         this.nachricht(k.id, (m) => ({ ...m, text: k.text.slice(0, n) }));
